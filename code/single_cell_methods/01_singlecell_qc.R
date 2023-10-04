@@ -8,6 +8,7 @@ library(patchwork)
 library(ggside)
 library(ggpubr)
 library(dplyr)
+library(tidyr)
 
 # Save directories
 plot_dir = here("plots","single_cell_methods")
@@ -285,7 +286,9 @@ pdf(width=20, height=10,here(plot_dir, "SpotPlot_discard_new.pdf"))
 dev.off()
 
 
+# =========== Now let's quantify the discarded spots based on layer ID =========
 
+# ==== Total percentage =====
 # Extract the required columns from the spe object
 discard_new_col <- spe$discard_new
 layer_guess_ordered_col <- spe$layer_guess_reordered
@@ -320,7 +323,7 @@ dev.off()
 
 
 
-
+# ===== Average percentage across samples =====
 # Extract the required columns
 discard_new_col <- spe$discard_new
 layer_guess_ordered_col <- spe$layer_guess_reordered
@@ -331,6 +334,8 @@ df <- data.frame(discard_new = discard_new_col,
                  layer_guess_ordered = layer_guess_ordered_col,
                  sample_id = sample_id_col)
 
+df <- df[!is.na(df$layer_guess_ordered), ]
+
 # Filter out the discarded spots
 discarded_df <- df[df$discard_new == TRUE, ]
 
@@ -339,21 +344,27 @@ summary_df <- discarded_df %>%
   group_by(sample_id, layer_guess_ordered) %>%
   summarise(n = n()) %>%
   mutate(percentage = (n / sum(n)) * 100)
+  
+# Create a dataframe with every possible combination of sample_id and layer_guess_ordered
+all_combinations <- expand(df, sample_id, layer_guess_ordered)
+
+# Left join summary_df onto all_combinations, filling in missing values with 0
+final_df <- left_join(all_combinations, summary_df, by = c("sample_id", "layer_guess_ordered")) %>%
+  replace_na(list(n = 0, percentage = 0))
 
 # Plot using ggplot2
-p <- ggplot(summary_df, aes(x = layer_guess_ordered, y = percentage, fill = layer_guess_ordered)) +
-  geom_violin() +
-  geom_jitter(width = 0.2, size = 2, alpha = 0.5) +  # Display all data points
+p <- ggplot(final_df, aes(x = layer_guess_ordered, y = percentage, fill = layer_guess_ordered)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  geom_jitter(width = 0.2, size = 2, aes(color = layer_guess_ordered), alpha = 0.7) +  # Display all data points with matching layer colors
   scale_fill_manual(values = spatialLIBD::libd_layer_colors) +
+  scale_color_manual(values = spatialLIBD::libd_layer_colors) +
   labs(title = "Percentage of Discarded Spots by Spatial Domain for each Sample ID",
        x = "Spatial Domain",
        y = "Percentage") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_text(aes(label=sample_id), position=position_jitter())
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-pdf(width=12, height=6,here(plot_dir, "Boxplot_discarded_by_layer.pdf"))
+pdf(width=8, height=4,here(plot_dir, "Boxplot_discarded_by_layer.pdf"))
 p
 dev.off()
 
-  
