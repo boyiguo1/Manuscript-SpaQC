@@ -5,6 +5,8 @@ library(scater)
 library(ggspavis)
 library(scran)
 library(patchwork)
+library(ggside)
+library(ggpubr)
 
 # Save directories
 plot_dir = here("plots","single_cell_methods")
@@ -194,4 +196,122 @@ p2 <- ggplot(combined_data, aes(x=sum_umi, fill=layer)) +
 
 pdf(height = 5, width=10, here(plot_dir, 'Histogram_dlPFC_sum_by_layer.pdf'))
 (p1+p2)
+dev.off()
+
+
+
+# ================= Let's now look at how discarding spots based on standard single cell QC metrics effects layers =============
+
+
+
+threshold_x = 500
+threshold_y = 0.3
+p <- ggplot(combined_data, aes(x = sum_umi, y = expr_ratio, color=layer)) + 
+  geom_point(size = 0.5, alpha=0.2) + 
+  ggtitle("QC metrics") + 
+  theme_bw() + 
+  scale_color_manual(name = "", values = spatialLIBD::libd_layer_colors) +
+  geom_vline(xintercept = threshold_x, color = "black", linetype="dashed") +
+  geom_hline(yintercept = threshold_y, color = "black", linetype="dashed") +
+  geom_xsidedensity() + 
+  geom_ysidedensity() +
+  stat_ellipse()
+
+
+pdf(here(plot_dir, "QCscatter_MitoPercent_vs_SumUmi_elipse.pdf"))
+p
+dev.off()
+
+# ======== Let's discard based on these conservative threshold and see how it looks =======
+
+qc_mito <- colData(spe)$expr_chrM_ratio > 0.3 # this is arbitrary
+table(qc_mito)
+# FALSE  TRUE 
+# 47401   280 
+
+qc_umi <- colData(spe)$sum_umi < 500 # this is arbitrary
+table(qc_umi)
+# FALSE  TRUE 
+# 47372   309 
+
+colData(spe)$qc_mito <- qc_mito
+colData(spe)$qc_umi <- qc_umi
+
+discard_new <- qc_umi | qc_mito
+spe$discard_new <- discard_new
+
+
+p1 <- vis_clus(
+  spe = spe,
+  clustervar = "layer_guess_reordered",
+  sampleid = unique(spe$sample_id)[1]
+)
+
+p2 <- vis_clus(
+  spe = spe,
+  clustervar = "layer_guess_reordered",
+  sampleid = unique(spe$sample_id)[2]
+)
+
+p3 <- vis_clus(
+  spe = spe,
+  clustervar = "layer_guess_reordered",
+  sampleid = unique(spe$sample_id)[3]
+)
+
+p4 <- vis_clus(
+  spe = spe,
+  clustervar = "discard_new",
+  sampleid = unique(spe$sample_id)[1]
+)
+
+p5 <- vis_clus(
+  spe = spe,
+  clustervar = "discard_new",
+  sampleid = unique(spe$sample_id)[2]
+)
+
+p6 <- vis_clus(
+  spe = spe,
+  clustervar = "discard_new",
+  sampleid = unique(spe$sample_id)[3]
+)
+
+
+pdf(width=20, height=10,here(plot_dir, "SpotPlot_discard_new.pdf"))
+(p1+p2+p3)/(p4+p5+p6)
+dev.off()
+
+
+
+# Extract the required columns from the spe object
+discard_new_col <- spe$discard_new
+layer_guess_ordered_col <- spe$layer_guess_reordered
+
+# Filter out the discarded spots
+discarded_indices <- which(discard_new_col == TRUE)
+discarded_domains <- layer_guess_ordered_col[discarded_indices]
+
+# Count the occurrences of each spatial domain for the discarded spots
+domain_counts <- table(discarded_domains)
+
+# Convert to percentages
+domain_percentages <- (domain_counts / sum(domain_counts)) * 100
+
+# Convert the domain counts to a data frame
+df <- as.data.frame(domain_percentages)
+colnames(df) <- c("SpatialDomain", "Percentage")
+
+# Plot using ggplot2
+p <- ggplot(df, aes(x = SpatialDomain, y = Percentage, fill = SpatialDomain)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = spatialLIBD::libd_layer_colors) +
+  labs(title = "Percentage of Discarded Spots by Spatial Domain",
+       x = "Spatial Domain",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+pdf(width=6, height=3,here(plot_dir, "Barplot_discarded_by_layer.pdf"))
+p
 dev.off()
