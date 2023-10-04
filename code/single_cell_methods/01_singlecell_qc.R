@@ -7,6 +7,7 @@ library(scran)
 library(patchwork)
 library(ggside)
 library(ggpubr)
+library(dplyr)
 
 # Save directories
 plot_dir = here("plots","single_cell_methods")
@@ -15,6 +16,7 @@ processed_dir = here("processed-data","single_cell_methods")
 # ============== Let's plot some metrics using the final published data =========
 
 spe <- fetch_data(type = "spe")
+spe
 # class: SpatialExperiment 
 # dim: 33538 47681 
 # metadata(0):
@@ -315,3 +317,43 @@ p <- ggplot(df, aes(x = SpatialDomain, y = Percentage, fill = SpatialDomain)) +
 pdf(width=6, height=3,here(plot_dir, "Barplot_discarded_by_layer.pdf"))
 p
 dev.off()
+
+
+
+
+# Extract the required columns
+discard_new_col <- spe$discard_new
+layer_guess_ordered_col <- spe$layer_guess_reordered
+sample_id_col <- spe$sample_id
+
+# Create a data frame
+df <- data.frame(discard_new = discard_new_col,
+                 layer_guess_ordered = layer_guess_ordered_col,
+                 sample_id = sample_id_col)
+
+# Filter out the discarded spots
+discarded_df <- df[df$discard_new == TRUE, ]
+
+# Group by sample_id and layer_guess_ordered, then calculate percentages
+summary_df <- discarded_df %>%
+  group_by(sample_id, layer_guess_ordered) %>%
+  summarise(n = n()) %>%
+  mutate(percentage = (n / sum(n)) * 100)
+
+# Plot using ggplot2
+p <- ggplot(summary_df, aes(x = layer_guess_ordered, y = percentage, fill = layer_guess_ordered)) +
+  geom_violin() +
+  geom_jitter(width = 0.2, size = 2, alpha = 0.5) +  # Display all data points
+  scale_fill_manual(values = spatialLIBD::libd_layer_colors) +
+  labs(title = "Percentage of Discarded Spots by Spatial Domain for each Sample ID",
+       x = "Spatial Domain",
+       y = "Percentage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_text(aes(label=sample_id), position=position_jitter())
+
+pdf(width=12, height=6,here(plot_dir, "Boxplot_discarded_by_layer.pdf"))
+p
+dev.off()
+
+  
