@@ -7,7 +7,7 @@ library(here)
 plot_dir = here('plots', 'spatial_methods', '01_neighbor_methods')
 
 # =========================================================================================================
-# This was taken from https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
+# All of this was copied from https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
 
 data(meuse)
 coordinates(meuse) <- ~x+y
@@ -185,3 +185,75 @@ dev.off()
 #  but it's something to keep in mind for later. 
 
 
+# ========================= Integrating this with SPE ============================
+# Let's see how this works with SPE objects. 
+
+library(SpatialExperiment)
+library(spatialLIBD)
+library(ggspavis)
+
+spe <- fetch_data(type = "spe")
+spe
+
+spe.subset <- subset(spe, ,sample_id == "151507")
+
+head(spatialCoords(spe.subset))
+#.                   pxl_col_in_fullres pxl_row_in_fullres
+# AAACAACGAATAGTTC-1               3276               2514
+# AAACAAGTATCTCCCA-1               9178               8520
+# AAACAATCTACTAGCA-1               5133               2878
+# AAACACCAATAACTGC-1               3462               9581
+# AAACAGCTTTCAGAAG-1               2779               7663
+# AAACAGGGTCTATATT-1               3053               8143
+
+dnn <- RANN::nn2(spatialCoords(spe.subset), k=15, searchtype="standard")$nn.idx 
+head(dnn)
+# [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10]
+# [1,]    1 3170 1086 1339 2809 4044 3715 2274 3064  2557
+# [2,]    2 1204 4115  454 2434 2692  551  658 1024  3599
+# [3,]    3 3339 1708  788 2514 1856 2699 1717 1423  3607
+# [4,]    4 2628 3856 2114  665 3515 2931 1133 2751  2590
+# [5,]    5 2066 2202  510 1476 1377 3312  346  438  3878
+# [6,]    6 1598 1613 2301 1493 4070  309  653 4130  2390
+
+# Add discrete values for random spot (50) and it's neighbors
+spe.subset$nn_standard <- 0 # add zeros
+spe.subset$nn_standard[50] <- 1 # spot = 1
+
+neighbors_of_first_spot <- dnn[50, -1]
+spe.subset$nn_standard[neighbors_of_first_spot] <- 2 # nn = 2
+colnames(colData(spe.subset))
+# [1] "sample_id"                   "Cluster"                     "sum_umi"                     "sum_gene"                   
+# [5] "subject"                     "position"                    "replicate"                   "subject_position"           
+# [9] "discard"                     "key"                         "cell_count"                  "SNN_k50_k4"                 
+# [13] "SNN_k50_k5"                  "SNN_k50_k6"                  "SNN_k50_k7"                  "SNN_k50_k8"                 
+# [17] "SNN_k50_k9"                  "SNN_k50_k10"                 "SNN_k50_k11"                 "SNN_k50_k12"                
+# [21] "SNN_k50_k13"                 "SNN_k50_k14"                 "SNN_k50_k15"                 "SNN_k50_k16"                
+# [25] "SNN_k50_k17"                 "SNN_k50_k18"                 "SNN_k50_k19"                 "SNN_k50_k20"                
+# [29] "SNN_k50_k21"                 "SNN_k50_k22"                 "SNN_k50_k23"                 "SNN_k50_k24"                
+# [33] "SNN_k50_k25"                 "SNN_k50_k26"                 "SNN_k50_k27"                 "SNN_k50_k28"                
+# [37] "GraphBased"                  "Maynard"                     "Martinowich"                 "layer_guess"                
+# [41] "layer_guess_reordered"       "layer_guess_reordered_short" "expr_chrM"                   "expr_chrM_ratio"            
+# [45] "SpatialDE_PCA"               "SpatialDE_pool_PCA"          "HVG_PCA"                     "pseudobulk_PCA"             
+# [49] "markers_PCA"                 "SpatialDE_UMAP"              "SpatialDE_pool_UMAP"         "HVG_UMAP"                   
+# [53] "pseudobulk_UMAP"             "markers_UMAP"                "SpatialDE_PCA_spatial"       "SpatialDE_pool_PCA_spatial" 
+# [57] "HVG_PCA_spatial"             "pseudobulk_PCA_spatial"      "markers_PCA_spatial"         "SpatialDE_UMAP_spatial"     
+# [61] "SpatialDE_pool_UMAP_spatial" "HVG_UMAP_spatial"            "pseudobulk_UMAP_spatial"     "markers_UMAP_spatial"       
+# [65] "spatialLIBD"                 "ManualAnnotation"            "in_tissue"                   "array_row"                  
+# [69] "array_col"                   "nn_standard"  
+
+head(spe.subset$nn_standard)
+# [1] 0 0 0 0 0 0
+
+unique(spe.subset$nn_standard)
+# [1] 0 1 2
+
+
+# Visualize
+pdf(here(plot_dir, 'SpotPlot_neighbors_standard_k15.pdf'))
+vis_clus(
+  spe = spe.subset,
+  clustervar = "nn_standard",
+  sampleid = unique(spe.subset$sample_id)[1]
+)
+dev.off()
