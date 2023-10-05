@@ -1,9 +1,13 @@
-# This was taken from https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
-
 library(sp)
 library(spdep)
 library(RANN)
 library(spatialEco)
+library(here)
+
+plot_dir = here('plots', 'spatial_methods', '01_neighbor_methods')
+
+# =========================================================================================================
+# This was taken from https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
 
 data(meuse)
 coordinates(meuse) <- ~x+y
@@ -84,7 +88,7 @@ spplot(LocalI, "HotSpots", xlab="Local Moran’s-I Hot Spots", col.regions=c("bl
 
 
 
-# ========= 
+# =========================================================================================================
 # This definitely looks useful. RANN::nn2 appears similar to BiocNeighbors that Boyi
 # shared. It gives (IMO) more intuitive neighbor definitions, such as neighbores based on
 # radius; although radius may not be the best metric. 
@@ -93,6 +97,91 @@ spplot(LocalI, "HotSpots", xlab="Local Moran’s-I Hot Spots", col.regions=c("bl
 # TODO: Generate some visuals for calculated neighbors (similar to above "Hot Spots")
 
 
+# Visualize neighbor detection using various methods for RANN::nn2
 
+
+data(meuse)
+coordinates(meuse) <- ~x+y
+head(meuse)
+# coordinates cadmium copper lead zinc  elev       dist   om ffreq soil lime landuse dist.m
+# 1 (181072, 333611)    11.7     85  299 1022 7.909 0.00135803 13.6     1    1    1      Ah     50
+# 2 (181025, 333558)     8.6     81  277 1141 6.983 0.01222430 14.0     1    1    1      Ah     30
+# 3 (181165, 333537)     6.5     68  199  640 7.800 0.10302900 13.0     1    1    1      Ah    150
+# 4 (181298, 333484)     2.6     81  116  257 7.655 0.19009400  8.0     1    2    0      Ga    270
+# 5 (181307, 333330)     2.8     48  117  269 7.480 0.27709000  8.7     1    2    0      Ah    380
+# 6 (181390, 333260)     3.0     61  137  281 7.791 0.36406700  7.8     1    2    0      Ga    470
+
+
+
+# ======== NN by Radius ========
+dnn <- RANN::nn2(coordinates(meuse), searchtype="radius", 
+                 radius = 1000)$nn.idx 
+head(dnn)
+# [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10]
+# [1,]    1    2    3    8    7    4   13    5   14     9
+# [2,]    2    1    3    8    7   13    4   14    9    84
+# [3,]    3    1    2    4    7    8    5    9   84    14
+# [4,]    4    3    5    7    6    1    2    8   10    84
+# [5,]    5    6    7    4   10   84   11    3    9     8
+# [6,]    6    5   10    4   11    7   84   30    9     3
+
+
+# Add discrete values for random spot (50) and it's neighbors
+meuse$nn_radius <- 0 # add zeros
+meuse$nn_radius[50] <- 1 # spot = 1
+
+neighbors_of_first_spot <- dnn[50, -1]
+meuse$nn_radius[neighbors_of_first_spot] <- 2 # nn = 2
+head(meuse)
+# coordinates cadmium copper lead zinc  elev       dist   om ffreq soil lime landuse dist.m nn_radius
+# 1 (181072, 333611)    11.7     85  299 1022 7.909 0.00135803 13.6     1    1    1      Ah     50         1
+# 2 (181025, 333558)     8.6     81  277 1141 6.983 0.01222430 14.0     1    1    1      Ah     30         2
+# 3 (181165, 333537)     6.5     68  199  640 7.800 0.10302900 13.0     1    1    1      Ah    150         2
+# 4 (181298, 333484)     2.6     81  116  257 7.655 0.19009400  8.0     1    2    0      Ga    270         2
+# 5 (181307, 333330)     2.8     48  117  269 7.480 0.27709000  8.7     1    2    0      Ah    380         2
+# 6 (181390, 333260)     3.0     61  137  281 7.791 0.36406700  7.8     1    2    0      Ga    470         0
+
+# visualize
+pdf(here(plot_dir,"RANN_example_neighbors_radius.pdf"))
+spplot(meuse, "nn_radius", xlab="Example Radius NN", col.regions=c("darkgrey", "red","blue") )
+dev.off()
+
+
+
+# ======== NN by Standard (exact neighbors) ========
+dnn <- RANN::nn2(coordinates(meuse), searchtype="standard")$nn.idx 
+head(dnn)
+# [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10]
+# [1,]    1    2    3    8    7    4   13    5   14     9
+# [2,]    2    1    3    8    7   13    4   14    9    84
+# [3,]    3    1    2    4    7    8    5    9   84    14
+# [4,]    4    3    5    7    6    1    2    8   10    84
+# [5,]    5    6    7    4   10   84   11    3    9     8
+# [6,]    6    5   10    4   11    7   84   30    9     3
+
+
+# Add discrete values for random spot (50) and it's neighbors
+meuse$nn_standard <- 0 # add zeros
+meuse$nn_standard[50] <- 1 # spot = 1
+
+neighbors_of_first_spot <- dnn[50, -1]
+meuse$nn_standard[neighbors_of_first_spot] <- 2 # nn = 2
+head(meuse)
+# coordinates cadmium copper lead zinc  elev       dist   om ffreq soil lime landuse dist.m nn_radius
+# 1 (181072, 333611)    11.7     85  299 1022 7.909 0.00135803 13.6     1    1    1      Ah     50         1
+# 2 (181025, 333558)     8.6     81  277 1141 6.983 0.01222430 14.0     1    1    1      Ah     30         2
+# 3 (181165, 333537)     6.5     68  199  640 7.800 0.10302900 13.0     1    1    1      Ah    150         2
+# 4 (181298, 333484)     2.6     81  116  257 7.655 0.19009400  8.0     1    2    0      Ga    270         2
+# 5 (181307, 333330)     2.8     48  117  269 7.480 0.27709000  8.7     1    2    0      Ah    380         2
+# 6 (181390, 333260)     3.0     61  137  281 7.791 0.36406700  7.8     1    2    0      Ga    470         0
+
+# visualize
+pdf(here(plot_dir,"RANN_example_neighbors_standard.pdf"))
+spplot(meuse, "nn_standard", xlab="Example Exact NN (k=10)", col.regions=c("darkgrey", "red","blue") )
+dev.off()
+
+
+# Notes: It seems like radius and standard (exact) give very similar results. I'm not sure really where this would vary,
+#  but it's something to keep in mind for later. 
 
 
