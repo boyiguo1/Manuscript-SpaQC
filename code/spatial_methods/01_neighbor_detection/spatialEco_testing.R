@@ -4,7 +4,7 @@ library(RANN)
 library(spatialEco)
 library(here)
 
-plot_dir = here('plots', 'spatial_methods', '01_neighbor_methods')
+plot_dir = here('plots', 'spatial_methods', '01_neighbor_detection')
 
 # =========================================================================================================
 # All of this was copied from https://gis.stackexchange.com/questions/219255/spatial-outliers-detection-in-r
