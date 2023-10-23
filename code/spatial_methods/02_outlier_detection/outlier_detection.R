@@ -10,6 +10,7 @@ library(mvoutlier)
 library(BiocNeighbors)
 #library(spatialEco)
 library(escheR)
+library(patchwork)
 
 
 
@@ -38,12 +39,12 @@ outliers <- function(x, s = 1.4826) {
 
 # ============= Playing around with multivariate outlier detection ============
 # load Iris data
-data(iris)
+# data(iris)
 
-virginica <- iris[101:150, 1:3]
+# virginica <- iris[101:150, 1:3]
 
-result <- mvn(data = virginica, mvnTest = "hz", 
-              multivariateOutlierMethod = "quan")
+# result <- mvn(data = virginica, mvnTest = "hz", 
+              # multivariateOutlierMethod = "quan")
 
 
 # ========================================================================
@@ -54,23 +55,23 @@ result <- mvn(data = virginica, mvnTest = "hz",
 # Update: Actually would prob make senses to run just on typical qc variables.
 #         Compare 1 vs many. 
 
-data(hemophilia)
-obj <- OutlierSign2(gr~.,data=hemophilia)
-obj
-
-getDistance(obj)            # returns an array of distances
-getClassLabels(obj, 1)      # returns an array of indices for a given class
-getCutoff(obj)              # returns an array of cutoff values (for each class, usually equal)
-getFlag(obj)                # returns an 0/1 array of flags
-plot(obj, class=2)          # standard plot function
-
-
+# data(hemophilia)
+# obj <- OutlierSign2(gr~.,data=hemophilia)
+# obj
+# 
+# getDistance(obj)            # returns an array of distances
+# getClassLabels(obj, 1)      # returns an array of indices for a given class
+# getCutoff(obj)              # returns an array of cutoff values (for each class, usually equal)
+# getFlag(obj)                # returns an 0/1 array of flags
+# plot(obj, class=2)          # standard plot function
 
 
 
 
 
 
+
+# =========== subset data to one sample and plot standard QC metrics ==============
 
 # get spe
 spe <- fetch_data(type = "spe")
@@ -89,22 +90,32 @@ head(spatialCoords(spe.subset))
 
 
 # Visualize UMI and Mito 
-pdf(here(plot_dir, 'SpotPlot_sum_umi.pdf'))
-vis_gene(
-  spe = spe.subset,
-  geneid = "sum_umi",
-  sampleid = unique(spe.subset$sample_id)[1]
-)
-dev.off()
-
-pdf(here(plot_dir, 'SpotPlot_mito_percent.pdf'))
-vis_gene(
+p1 <- vis_gene(
   spe = spe.subset,
   geneid = "expr_chrM_ratio",
   sampleid = unique(spe.subset$sample_id)[1]
 )
+
+p2 <- vis_gene(
+  spe = spe.subset,
+  geneid = "sum_umi",
+  sampleid = unique(spe.subset$sample_id)[1]
+)
+
+
+p3 <- vis_gene(
+  spe = spe.subset,
+  geneid = "sum_gene",
+  sampleid = unique(spe.subset$sample_id)[1]
+)
+
+pdf(height=10, width=20, here(plot_dir, 'SpotPlots_QCmetrics_raw.pdf'))
+(p1+p2+p3)
 dev.off()
 
+
+
+# ===================== Spatially aware QC ==============================
 # create a list of spatial coordinates and qc features
 spaQC <- colData(spe.subset)
 spaQC$coords <- spatialCoords(spe.subset)
@@ -126,51 +137,35 @@ head(dnn)
 # [5,] 2066 2202  510 1476 1377 3312  346  438 3878  1734  2773  2141  4211  3897  1933
 # [6,] 1598 1613 2301 1493 4070  309  653 2390 4130  2443  3601  3813   466  3062   764
 
+# NOTE: findKNN does NOT include the center spot in this output. Other methods do (RANN).
+
 
 # =========== Outlier detection based on Mito percent ==========
 var.mito<- rep(NA,nrow(spaQC))
 z.mito <- rep(NA,nrow(spaQC))  
 for(i in 1:nrow(dnn)){
   dnn.idx <- dnn[i,] 
-  var.mito[i] <- var( spaQC[c(i, dnn.idx[dnn.idx != 0], i),]$expr_chrM_ratio, na.rm=TRUE)
+  var.mito[i] <- var( spaQC[c(i, dnn.idx[dnn.idx != 0]),]$expr_chrM_ratio, na.rm=TRUE)
   z.mito[i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$expr_chrM_ratio)[1]
 }
 z.mito[!is.finite(z.mito)] <- 0 
 
 spe.subset$var.mito <- var.mito
 spe.subset$z.mito <- z.mito
-spe.subset$z_mito_4 <- ifelse(spe.subset$z.mito > 4, TRUE, FALSE)
+spe.subset$z_mito_outlier <- ifelse(spe.subset$z.mito > 3, TRUE, FALSE)
 
 # Visualize
-pdf(here(plot_dir, 'SpotPlot_z_mito_k15.pdf'))
-make_escheR(spe.subset) |> 
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "expr_chrM_ratio") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.mito") +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-dev.off()
 
-pdf(here(plot_dir, 'SpotPlot_var_mito_k15.pdf'))
-make_escheR(spe.subset) |> 
-  add_fill(var = "var.mito") +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-dev.off()
-
-pdf(here(plot_dir, 'SpotPlot_z_mito_k15_outliers.pdf'))
-make_escheR(spe.subset) |> 
-  add_fill(var = "z.mito") |>
-  add_ground(var = "z_mito_4", stroke = 1) +
-  scale_color_manual(
-    name = "", # turn off legend name for ground_truth
-    values = c(
-      "TRUE" = "red",
-      "FALSE" = "transparent")
-  ) +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-dev.off()
-
-pdf(here(plot_dir, 'SpotPlot_mito_k15_outliers.pdf'))
-make_escheR(spe.subset) |> 
+p3 <- make_escheR(spe.subset) |> 
   add_fill(var = "expr_chrM_ratio") |>
-  add_ground(var = "z_mito_4", stroke = 1) +
+  add_ground(var = "z_mito_outlier", stroke = 1) +
   scale_color_manual(
     name = "", # turn off legend name for ground_truth
     values = c(
@@ -178,11 +173,25 @@ make_escheR(spe.subset) |>
       "FALSE" = "transparent")
   ) +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.mito") |>
+  add_ground(var = "z_mito_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_mitoPercent_k15.pdf'))
+(p1+p2)/(p3+p4)
 dev.off()
 
 
 
-# =========== Outlier detection based on UMI ==========
+# =========== Outlier detection based on sum UMI ==========
 var.umi<- rep(NA,nrow(spaQC))
 z.umi <- rep(NA,nrow(spaQC))  
 for(i in 1:nrow(dnn)){
@@ -194,38 +203,20 @@ z.umi[!is.finite(z.umi)] <- 0
 
 spe.subset$var.umi <- var.umi
 spe.subset$z.umi <- z.umi
-spe.subset$z_umi_4 <- ifelse(spe.subset$z.umi > 4, TRUE, FALSE)
+spe.subset$z_umi_outlier <- ifelse(spe.subset$z.umi > 3 | spe.subset$z.umi < -3, TRUE, FALSE)
 
 # Visualize
-pdf(here(plot_dir, 'SpotPlot_z_umi_k15.pdf'))
-make_escheR(spe.subset) |> 
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.umi") +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-dev.off()
 
-pdf(here(plot_dir, 'SpotPlot_var_umi_k15.pdf'))
-make_escheR(spe.subset) |> 
-  add_fill(var = "var.umi") +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-dev.off()
-
-pdf(here(plot_dir, 'SpotPlot_z_umi_k15_outliers.pdf'))
-make_escheR(spe.subset) |> 
-  add_fill(var = "z.umi") |>
-  add_ground(var = "z_umi_4", stroke = 1) +
-  scale_color_manual(
-    name = "", # turn off legend name for ground_truth
-    values = c(
-      "TRUE" = "red",
-      "FALSE" = "transparent")
-  ) +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-dev.off()
-
-pdf(here(plot_dir, 'SpotPlot_sum_umi_k15_outliers.pdf'))
-p <- make_escheR(spe.subset) |> 
+p3 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi") |>
-  add_ground(var = "z_umi_4", stroke = 1) +
+  add_ground(var = "z_umi_outlier", stroke = 1) +
   scale_color_manual(
     name = "", # turn off legend name for ground_truth
     values = c(
@@ -233,5 +224,133 @@ p <- make_escheR(spe.subset) |>
       "FALSE" = "transparent")
   ) +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
-print(p)
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") |>
+  add_ground(var = "z_umi_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_UMI_k15.pdf'))
+(p1+p2)/(p3+p4)
+dev.off()
+
+
+
+# =========== Outlier detection based on sum gene ==========
+var.gene<- rep(NA,nrow(spaQC))
+z.gene <- rep(NA,nrow(spaQC))  
+for(i in 1:nrow(dnn)){
+  dnn.idx <- dnn[i,] 
+  var.gene[i] <- var( spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_gene, na.rm=TRUE)
+  z.gene[i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_gene)[1]
+}
+z.gene[!is.finite(z.gene)] <- 0 
+
+spe.subset$var.gene <- var.gene
+spe.subset$z.gene <- z.gene
+spe.subset$z_gene_outlier <- ifelse(spe.subset$z.gene > 3 | spe.subset$z.gene < -3, TRUE, FALSE)
+
+# Visualize
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_gene") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.gene") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p3 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_gene") |>
+  add_ground(var = "z_gene_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.gene") |>
+  add_ground(var = "z_gene_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_Gene_k15.pdf'))
+(p1+p2)/(p3+p4)
+dev.off()
+
+
+
+# ================ Let's now look at sum/detected genes on log2 scale ==================
+
+
+colData(spe)$sum_umi_log2 <- log2(spe$sum_umi)
+colData(spe)$sum_gene_log2 <- log2(spe$sum_gene)
+
+# Extract data from colData of the SPE object
+layer_data <- colData(spe)$layer_guess_reordered
+sum_gene <- colData(spe)$sum_gene
+sum_umi <- colData(spe)$sum_umi
+sum_umi_log2 <- colData(spe)$sum_umi_log2
+sum_gene_log2 <- colData(spe)$sum_gene_log2
+
+
+
+# Check that the lengths of the extracted data are the same
+if(length(expr_data) != length(layer_data)) {
+  stop("Mismatch in the lengths of expr_data and layer_data!")
+}
+
+# Combine the expression data with the layer data
+combined_data <- data.frame(
+  layer = layer_data,
+  sum_umi = sum_umi,
+  sum_gene = sum_gene,
+  sum_umi_log2 = sum_umi_log2,
+  sum_gene_log2 = sum_gene_log2
+)
+
+# Let's first plot the distributions of log2 scaled counts 
+
+
+
+p1 <- ggplot(combined_data, aes(x=sum_gene, fill=layer)) +
+  geom_histogram(alpha=0.5, position="identity", bins=30) +
+  theme_minimal() +
+  labs(title="Raw count of Sum Genes", x="Sum Genes", y="Count", fill="Layer")
+
+p2 <- ggplot(combined_data, aes(x=sum_gene_log2, fill=layer)) +
+  geom_histogram(alpha=0.5, position="identity", bins=30) +
+  theme_minimal() +
+  labs(title="Log2 transformation of Sum Genes", x="log2(Sum Genes)", y="Count", fill="Layer")
+
+pdf(height = 5, width=10, here(plot_dir, 'Histogram_sumGenes_vs_log2.pdf'))
+(p1+p2)
+dev.off()
+
+
+p1 <- ggplot(combined_data, aes(x=sum_umi, fill=layer)) +
+  geom_histogram(alpha=0.5, position="identity", bins=30) +
+  theme_minimal() +
+  labs(title="Raw count of Sum UMI", x="Sum UMI", y="Count", fill="Layer")
+
+p2 <- ggplot(combined_data, aes(x=sum_umi_log2, fill=layer)) +
+  geom_histogram(alpha=0.5, position="identity", bins=30) +
+  theme_minimal() +
+  labs(title="Log2 transformation of Sum UMI", x="Sum UMI", y="Count", fill="Layer")
+
+pdf(height = 5, width=10, here(plot_dir, 'Histogram_sumUMI_vs_log2.pdf'))
+(p1+p2)
 dev.off()
