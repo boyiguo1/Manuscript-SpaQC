@@ -1,5 +1,3 @@
-#library(sp)
-#library(spdep)
 library(RANN)
 library(here)
 library(SpatialExperiment)
@@ -252,7 +250,6 @@ for(i in 1:nrow(dnn)){
 }
 z.gene[!is.finite(z.gene)] <- 0 
 
-spe.subset$var.gene <- var.gene
 spe.subset$z.gene <- z.gene
 spe.subset$z_gene_outlier <- ifelse(spe.subset$z.gene > 3 | spe.subset$z.gene < -3, TRUE, FALSE)
 
