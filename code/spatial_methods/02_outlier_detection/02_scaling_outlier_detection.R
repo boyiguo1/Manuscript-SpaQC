@@ -42,35 +42,11 @@ outliers <- function(x, s = 1.4826) {
 
 
 
-# ===================== Find Neighbors ==============================
-# create a list of spatial coordinates and qc features
-spaQC <- colData(spe.subset)
-spaQC$coords <- spatialCoords(spe.subset)
-
-# Find nearest neighbors
-dnn <- findKNN(spatialCoords(spe.subset), k=15)$index
-
-
-
-# =========== Outlier detection based on Mito percent ==========
-var.mito<- rep(NA,nrow(spaQC))
-z.mito <- rep(NA,nrow(spaQC))  
-for(i in 1:nrow(dnn)){
-  dnn.idx <- dnn[i,] 
-  var.mito[i] <- var( spaQC[c(i, dnn.idx[dnn.idx != 0]),]$expr_chrM_ratio, na.rm=TRUE)
-  z.mito[i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$expr_chrM_ratio)[1]
-}
-z.mito[!is.finite(z.mito)] <- 0 
-
-spe.subset$var.mito <- var.mito
-spe.subset$z.mito <- z.mito
-spe.subset$z_mito_outlier <- ifelse(spe.subset$z.mito > 3, TRUE, FALSE)
-
-
-
-
 
 # ============ Scaled up ==============
+# log2 transform the sum_umi and sum_gene features
+colData(spe)$sum_umi_log2 <- log2(spe$sum_umi)
+colData(spe)$sum_gene_log2 <- log2(spe$sum_gene)
 
 # Create a list of spatial coordinates and qc features
 spaQC_total <- colData(spe)
@@ -80,15 +56,15 @@ spaQC_total$coords <- spatialCoords(spe)
 unique_sample_ids <- unique(spe$sample_id)
 
 # Initialize list variables to store the results
-var.mito <- vector("list", length(unique_sample_ids))
-z.mito <- vector("list", length(unique_sample_ids))
+var.umi <- vector("list", length(unique_sample_ids))
+z.umi <- vector("list", length(unique_sample_ids))
 
 # Initialize a list to store each spaQC dataframe
 spaQC_list <- vector("list", length(unique_sample_ids))
 
 
 # Loop through each unique sample ID
-for(sample_id in seq_along(unique_sample_ids)) {
+for(sample_id in seq_along(unique_sample_ids[1:2])) {
   
   # Subset the data for the current sample
   sample <- unique_sample_ids[sample_id]
@@ -100,33 +76,39 @@ for(sample_id in seq_along(unique_sample_ids)) {
   spaQC$coords <- spatialCoords(spe_subset)
   
   # Find nearest neighbors
+  tic()
   dnn <- findKNN(spatialCoords(spe_subset), k=15)$index
+  toc()
   
   # =========== Outlier detection based on Mito percent ==========
   # Initialize variables for the current sample
-  var.mito[[sample_id]] <- rep(NA, nrow(spaQC))
-  z.mito[[sample_id]] <- rep(NA, nrow(spaQC))
+  var.umi[[sample_id]] <- rep(NA, nrow(spaQC))
+  z.umi[[sample_id]] <- rep(NA, nrow(spaQC))
   
-  # Loop through each row in the nearest neighbor index matrix
-  for(i in 1:nrow(dnn)) {
-    dnn.idx <- dnn[i,]
-    var.mito[[sample_id]][i] <- var(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$expr_chrM_ratio, na.rm=TRUE)
-    z.mito[[sample_id]][i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$expr_chrM_ratio)[1]
-  }
+  # calculate variance and z-score
+  var.umi[[sample_id]] <- apply(dnn, 1, function(dnn.idx) {
+    var(spaQC[c(dnn.idx[dnn.idx != 0]),]$sum_umi_log2, na.rm=TRUE)
+  })
+
+  z.umi[[sample_id]] <- apply(dnn, 1, function(dnn.idx) {
+    outliers(spaQC[c(dnn.idx[dnn.idx != 0]),]$sum_umi_log2)[1]
+  })
+
   
   # Handle non-finite values
-  z.mito[[sample_id]][!is.finite(z.mito[[sample_id]])] <- 0
+  z.mito[[sample_id]][!is.finite(z.umi[[sample_id]])] <- 0
   
-  spaQC$var.mito <- var.mito[[sample_id]]
-  spaQC$z.mito <- z.mito[[sample_id]]
-  spaQC$z_mito_outlier <- ifelse(spaQC$z.mito[[sample_id]] > 3 | spaQC$z.mito[[sample_id]] < -3, TRUE, FALSE)
+  # Save stats to the spaQC dataframe
+  spaQC$var.umi <- var.umi[[sample_id]]
+  spaQC$z.umi <- z.umi[[sample_id]]
+  spaQC$z_umi_outlier <- ifelse(spaQC$z.umi > 2 | spaQC$z.umi < -2, TRUE, FALSE)
   
   # Store the modified spaQC dataframe in the list
   spaQC_list[[sample_id]] <- spaQC
-  
-  
+
 }
 
+# rbind the list of dataframes
 spaQC_aggregated <- do.call(rbind, spaQC_list)
 
 colData(spe) <- spaQC_aggregated
@@ -138,3 +120,44 @@ colnames(colData(spe))
 # [21] "subject"                "region"                 "sex"                    "age"                    "diagnosis"             
 # [26] "sample_id_complete"     "count"                  "coords"                 "var.mito"               "z.mito"                
 # [31] "z_mito_outlier"     
+
+
+
+
+# ====================== Explore these outliers ======================
+
+spe.subset <- subset(spe, ,sample_id == "Br2743_mid")
+# Visualize
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi_log2") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p3 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi_log2") |>
+  add_ground(var = "z_umi_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") |>
+  add_ground(var = "z_umi_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k15.pdf'))
+(p1+p2)/(p3+p4)
+dev.off()
