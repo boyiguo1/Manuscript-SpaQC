@@ -39,10 +39,6 @@ outliers <- function(x, s = 1.4826) {
   return( ( (0.6745 * (x - stats::median(x))) / mad(x) ) )
 }
 
-
-
-
-
 # ============ Scaled up ==============
 # log2 transform the sum_umi and sum_gene features
 colData(spe)$sum_umi_log2 <- log2(spe$sum_umi)
