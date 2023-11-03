@@ -13,11 +13,10 @@ library(tictoc)
 plot_dir = here('plots', 'spatial_methods', '02_outlier_detection')
 processed_dir = here('processed-data', 'spatial_methods')
 
-load(here('raw-data', "dlPFC_raw.Rdata"))
-spe <- spe_raw
+## Download the spot-level data
+spe <- fetch_data(type = "spe")
 spe
 
-rm(spe_raw)
 
 # =========== Outlier function ==============
 # as of 10/17/23, the spatialEco function was removed from CRAN due to a bad build
@@ -38,6 +37,8 @@ outliers <- function(x, s = 1.4826) {
   }                         
   return( ( (0.6745 * (x - stats::median(x))) / mad(x) ) )
 }
+
+
 
 # ============ Scaled up ==============
 # log2 transform the sum_umi and sum_gene features
@@ -60,7 +61,7 @@ spaQC_list <- vector("list", length(unique_sample_ids))
 
 
 # Loop through each unique sample ID
-for(sample_id in seq_along(unique_sample_ids[1:2])) {
+for(sample_id in seq_along(unique_sample_ids)) {
   
   # Subset the data for the current sample
   sample <- unique_sample_ids[sample_id]
@@ -72,39 +73,33 @@ for(sample_id in seq_along(unique_sample_ids[1:2])) {
   spaQC$coords <- spatialCoords(spe_subset)
   
   # Find nearest neighbors
-  tic()
   dnn <- findKNN(spatialCoords(spe_subset), k=15)$index
-  toc()
   
   # =========== Outlier detection based on Mito percent ==========
   # Initialize variables for the current sample
   var.umi[[sample_id]] <- rep(NA, nrow(spaQC))
   z.umi[[sample_id]] <- rep(NA, nrow(spaQC))
   
-  # calculate variance and z-score
-  var.umi[[sample_id]] <- apply(dnn, 1, function(dnn.idx) {
-    var(spaQC[c(dnn.idx[dnn.idx != 0]),]$sum_umi_log2, na.rm=TRUE)
-  })
-
-  z.umi[[sample_id]] <- apply(dnn, 1, function(dnn.idx) {
-    outliers(spaQC[c(dnn.idx[dnn.idx != 0]),]$sum_umi_log2)[1]
-  })
-
+  # Loop through each row in the nearest neighbor index matrix
+  for(i in 1:nrow(dnn)) {
+    dnn.idx <- dnn[i,]
+    var.umi[[sample_id]][i] <- var(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_umi_log2, na.rm=TRUE)
+    z.umi[[sample_id]][i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_umi_log2)[1]
+  }
   
   # Handle non-finite values
-  z.mito[[sample_id]][!is.finite(z.umi[[sample_id]])] <- 0
+  z.umi[[sample_id]][!is.finite(z.umi[[sample_id]])] <- 0
   
-  # Save stats to the spaQC dataframe
   spaQC$var.umi <- var.umi[[sample_id]]
   spaQC$z.umi <- z.umi[[sample_id]]
-  spaQC$z_umi_outlier <- ifelse(spaQC$z.umi > 2 | spaQC$z.umi < -2, TRUE, FALSE)
+  spaQC$z_umi_outlier <- ifelse(spaQC$z.umi > 3 | spaQC$z.umi < -3, TRUE, FALSE)
   
   # Store the modified spaQC dataframe in the list
   spaQC_list[[sample_id]] <- spaQC
-
+  
+  
 }
 
-# rbind the list of dataframes
 spaQC_aggregated <- do.call(rbind, spaQC_list)
 
 colData(spe) <- spaQC_aggregated
@@ -122,7 +117,7 @@ colnames(colData(spe))
 
 # ====================== Explore these outliers ======================
 
-spe.subset <- subset(spe, ,sample_id == "Br2743_mid")
+spe.subset <- subset(spe, ,sample_id == spe$sample_id[1])
 # Visualize
 p1 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") +

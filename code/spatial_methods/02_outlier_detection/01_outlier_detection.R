@@ -11,8 +11,14 @@ library(escheR)
 library(patchwork)
 
 
-
 plot_dir = here('plots', 'spatial_methods', '02_outlier_detection')
+
+## Download the spot-level data
+spe <- fetch_data(type = "spe")
+
+## This is a SpatialExperiment object
+spe
+
 
 
 # =========== Outlier function ==============
@@ -72,11 +78,11 @@ outliers <- function(x, s = 1.4826) {
 # =========== subset data to one sample and plot standard QC metrics ==============
 
 # get spe
-spe <- fetch_data(type = "spe")
-spe
+#spe <- fetch_data(type = "spe")
+#spe
 
 # subset spe to one sample for testing purposes
-spe.subset <- subset(spe, ,sample_id == "151507")
+spe.subset <- subset(spe, ,sample_id == unique(spe$sample_id[1]))
 head(spatialCoords(spe.subset))
 #.                   pxl_col_in_fullres pxl_row_in_fullres
 # AAACAACGAATAGTTC-1               3276               2514
@@ -303,12 +309,6 @@ sum_umi <- colData(spe)$sum_umi
 sum_umi_log2 <- colData(spe)$sum_umi_log2
 sum_gene_log2 <- colData(spe)$sum_gene_log2
 
-
-
-# Check that the lengths of the extracted data are the same
-if(length(expr_data) != length(layer_data)) {
-  stop("Mismatch in the lengths of expr_data and layer_data!")
-}
 
 # Combine the expression data with the layer data
 combined_data <- data.frame(
