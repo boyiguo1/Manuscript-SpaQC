@@ -121,7 +121,7 @@ spe.subset <- subset(spe, ,sample_id == spe$sample_id[1])
 # Visualize
 p1 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p2 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.umi") +
@@ -136,7 +136,7 @@ p3 <- make_escheR(spe.subset) |>
       "TRUE" = "red",
       "FALSE" = "transparent")
   ) +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p4 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.umi") |>

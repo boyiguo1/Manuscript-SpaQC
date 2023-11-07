@@ -378,11 +378,11 @@ spe.subset$z_umi_outlier <- ifelse(spe.subset$z.umi > 3 | spe.subset$z.umi < -3,
 # Visualize
 p1 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient(low ="white", high =  "darkgreen")
 
 p2 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.umi") +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient2(low ="purple", mid="white" ,high =  "darkgreen")
 
 p3 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") |>
@@ -393,7 +393,7 @@ p3 <- make_escheR(spe.subset) |>
       "TRUE" = "red",
       "FALSE" = "transparent")
   ) +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p4 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.umi") |>
@@ -429,7 +429,7 @@ spe.subset$z_gene_outlier <- ifelse(spe.subset$z.gene > 3 | spe.subset$z.gene < 
 # Visualize
 p1 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_gene_log2") +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient(low = "white",high =  "darkgreen")
 
 p2 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.gene") +
@@ -444,7 +444,7 @@ p3 <- make_escheR(spe.subset) |>
       "TRUE" = "red",
       "FALSE" = "transparent")
   ) +
-  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+  scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p4 <- make_escheR(spe.subset) |> 
   add_fill(var = "z.gene") |>
@@ -460,3 +460,117 @@ p4 <- make_escheR(spe.subset) |>
 pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_Gene_log2_k15.pdf'))
 (p1+p2)/(p3+p4)
 dev.off()
+
+
+
+
+
+
+# ============= Finally, Let's rerun the gene/umi metrics using log10 ===========
+
+colData(spe.subset)$sum_umi_log10 <- log10(spe.subset$sum_umi)
+colData(spe.subset)$sum_gene_log10 <- log10(spe.subset$sum_gene)
+
+spaQC <- colData(spe.subset)
+spaQC$coords <- spatialCoords(spe.subset)
+
+# =========== Outlier detection based on sum log2(UMI) ==========
+var.umi<- rep(NA,nrow(spaQC))
+z.umi <- rep(NA,nrow(spaQC))  
+for(i in 1:nrow(dnn)){
+  dnn.idx <- dnn[i,] 
+  var.umi[i] <- var( spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_umi_log2, na.rm=TRUE)
+  z.umi[i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_umi_log2)[1]
+}
+z.umi[!is.finite(z.umi)] <- 0 
+
+spe.subset$var.umi <- var.umi
+spe.subset$z.umi <- z.umi
+spe.subset$z_umi_outlier <- ifelse(spe.subset$z.umi > 3 | spe.subset$z.umi < -3, TRUE, FALSE)
+
+# Visualize
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi_log10") +
+  scale_fill_gradient(low ="white", high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") +
+  scale_fill_gradient2(low ="purple", mid="white" ,high =  "darkgreen")
+
+p3 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi_log10") |>
+  add_ground(var = "z_umi_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient(low ="white",high =  "darkgreen")
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") |>
+  add_ground(var = "z_umi_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_UMI_log10_k15.pdf'))
+(p1+p2)/(p3+p4)
+dev.off()
+
+
+
+# =========== Outlier detection based on sum gene ==========
+var.gene<- rep(NA,nrow(spaQC))
+z.gene <- rep(NA,nrow(spaQC))  
+for(i in 1:nrow(dnn)){
+  dnn.idx <- dnn[i,] 
+  var.gene[i] <- var( spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_gene_log2, na.rm=TRUE)
+  z.gene[i] <- outliers(spaQC[c(i, dnn.idx[dnn.idx != 0]),]$sum_gene_log2)[1]
+}
+z.gene[!is.finite(z.gene)] <- 0 
+
+spe.subset$var.gene <- var.gene
+spe.subset$z.gene <- z.gene
+spe.subset$z_gene_outlier <- ifelse(spe.subset$z.gene > 3 | spe.subset$z.gene < -3, TRUE, FALSE)
+
+# Visualize
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_gene_log10") +
+  scale_fill_gradient(low = "white",high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.gene") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p3 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_gene_log10") |>
+  add_ground(var = "z_gene_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient(low ="white",high =  "darkgreen")
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.gene") |>
+  add_ground(var = "z_gene_outlier", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_Gene_log10_k15.pdf'))
+(p1+p2)/(p3+p4)
+dev.off()
+
