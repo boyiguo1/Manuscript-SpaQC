@@ -336,15 +336,20 @@ df <- data.frame(discard_new = discard_new_col,
 
 df <- df[!is.na(df$layer_guess_ordered), ]
 
-# Filter out the discarded spots
-discarded_df <- df[df$discard_new == TRUE, ]
 
-# Group by sample_id and layer_guess_ordered, then calculate percentages
-summary_df <- discarded_df %>%
+# Assuming discarded_df has a logical column 'discard_new' where TRUE indicates a discarded spot
+summary_df <- df %>%
   group_by(sample_id, layer_guess_ordered) %>%
-  summarise(n = n()) %>%
-  mutate(percentage = (n / sum(n)) * 100)
-  
+  summarise(
+    total_spots = n(),  # Total number of spots in each domain for each sample
+    discarded_spots = sum(discard_new, na.rm = TRUE),  # Counting TRUE as 1 and FALSE as 0
+    .groups = 'drop'  # Dropping the grouping after summarise
+  ) %>%
+  mutate(
+    percentage_discarded = (discarded_spots / total_spots) * 100  # Calculating the percentage
+  )
+
+
 # Create a dataframe with every possible combination of sample_id and layer_guess_ordered
 all_combinations <- expand(df, sample_id, layer_guess_ordered)
 
