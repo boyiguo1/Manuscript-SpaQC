@@ -1,4 +1,4 @@
-#devtools::install("/Users/mtotty2/Documents/R/SpotSweeper")
+devtools::install("/Users/mtotty2/Documents/R/SpotSweeper")
 library(SpotSweeper)
 
 library(RANN)
@@ -30,7 +30,8 @@ spe
 # I turned the above code into functions in the private SpotSweeper package
 # https://github.com/MicTott/SpotSweeper
 
-spe <- localOutliers(spe, k= 6, threshold=3)
+spe <- localOutliers(spe, k= 6, feature='sum_umi', samples='sample_id', log2=TRUE, z_threshold=3, output_z=TRUE)
+
 
 
 # ====================== Explore these outliers ======================
@@ -42,12 +43,12 @@ p1 <- make_escheR(spe.subset) |>
   scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p2 <- make_escheR(spe.subset) |> 
-  add_fill(var = "z.umi") +
+  add_fill(var = "sum_umi_z") +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
 
 p3 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") |>
-  add_ground(var = "z_umi_outlier", stroke = 1) +
+  add_ground(var = "local_outliers", stroke = 1) +
   scale_color_manual(
     name = "", # turn off legend name for ground_truth
     values = c(
@@ -57,8 +58,8 @@ p3 <- make_escheR(spe.subset) |>
   scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p4 <- make_escheR(spe.subset) |> 
-  add_fill(var = "z.umi") |>
-  add_ground(var = "z_umi_outlier", stroke = 1) +
+  add_fill(var = "sum_umi_z") |>
+  add_ground(var = "local_outliers", stroke = 1) +
   scale_color_manual(
     name = "", # turn off legend name for ground_truth
     values = c(
@@ -67,7 +68,7 @@ p4 <- make_escheR(spe.subset) |>
   ) +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
 
-pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k6.pdf'))
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k6_test.pdf'))
 (p1+p2)/(p3+p4)
 dev.off()
 
