@@ -129,7 +129,7 @@ df <- data.frame(
   gene = spe.subset$z.gene
 )
 
-distances <- dd.plot(df, quan=1/2, alpha=0.025)
+distances <- dd.plot(df, quan=1/2, alpha=0.00001)
 
 df <- data.frame(
   mito = spe.subset$z.mito,
@@ -164,6 +164,58 @@ p1 <- make_escheR(spe.subset) |>
 
 pdf(here(plot_dir, 'SpotPlots_mvoutliers.pdf'))
 p1
+dev.off()
+
+
+ggplot(as.data.frame(distances), aes(x=md.rob, y=md.cla, color=outliers)) +
+  geom_point()
+
+
+
+
+# ========= Local outlier factor using DBCAN ==========
+
+library(dbscan)
+df <- data.frame(
+  mito = spe.subset$z.mito,
+  umi = spe.subset$z.umi,
+  gene = spe.subset$z.gene
+)
+
+outs <- lof(df, minPts=20)
+outs_scaled <- lof(scale(df), minPts=20)
+
+df$lof_scaled <- outs_scaled
+df$lof <- outs
+
+
+summary(outs_scaled)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.9089  0.9945  1.0210  1.0525  1.0671  4.3245 
+
+summary(outs)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.9075  0.9944  1.0211  1.0523  1.0670  4.3158 
+
+hist(outs_scaled, breaks = 100)
+hist(outs, breaks = 100)
+
+scatter.smooth(outs,outs_scaled)
+
+df$outliers <- ifelse(df$lof_scaled > 3, TRUE, FALSE)
+
+p1 <- ggplot(df, aes(x=z.mito, y=z.umi, color=outliers)) +
+  geom_point()
+
+p2 <- ggplot(df, aes(x=z.mito, y=z.gene, color=outliers)) +
+  geom_point()
+
+
+p3 <- ggplot(df, aes(x=z.umi, y=z.gene, color=outliers)) +
+  geom_point()
+
+pdf(width=20, height=6, here(plot_dir,"LOF_outlier_scattplots.pdf"))
+p1+p2+p3
 dev.off()
 
 
