@@ -218,4 +218,45 @@ pdf(width=20, height=6, here(plot_dir,"LOF_outlier_scattplots.pdf"))
 p1+p2+p3
 dev.off()
 
+# ======== SpotPlots of MV outliers =========
+
+
+spe.subset$mvlocal_outliers <- df$outliers 
+
+# Visualize
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi_log2") +
+  scale_fill_gradient(low ="white",high =  "darkgreen")
+
+p2 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+p3 <- make_escheR(spe.subset) |> 
+  add_fill(var = "sum_umi_log2") |>
+  add_ground(var = "mvlocal_outliers", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient(low ="white",high =  "darkgreen")
+
+p4 <- make_escheR(spe.subset) |> 
+  add_fill(var = "z.umi") |>
+  add_ground(var = "mvlocal_outliers", stroke = 1) +
+  scale_color_manual(
+    name = "", # turn off legend name for ground_truth
+    values = c(
+      "TRUE" = "red",
+      "FALSE" = "transparent")
+  ) +
+  scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
+
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'SpotPlots_LOF_k20_LOF3.pdf'))
+(p1+p2)/(p3+p4)
+dev.off()
+
+
 

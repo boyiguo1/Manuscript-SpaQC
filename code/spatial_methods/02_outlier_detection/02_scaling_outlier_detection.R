@@ -73,7 +73,7 @@ for(sample_id in seq_along(unique_sample_ids)) {
   spaQC$coords <- spatialCoords(spe_subset)
   
   # Find nearest neighbors
-  dnn <- findKNN(spatialCoords(spe_subset), k=15)$index
+  dnn <- findKNN(spatialCoords(spe_subset), k=36)$index
   
   # =========== Outlier detection based on Mito percent ==========
   # Initialize variables for the current sample
@@ -149,6 +149,6 @@ p4 <- make_escheR(spe.subset) |>
   ) +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
 
-pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k15.pdf'))
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'New_Many_SpotPlots_sumUmi_k36.pdf'))
 (p1+p2)/(p3+p4)
 dev.off()

@@ -210,24 +210,26 @@ dev.off()
 
 # ============ Testing different Ks ==========
 
-spe <- localOutliers(spe, k=36 , threshold=3)
+spe <- localOutliers(spe, k=36, output_z=TRUE)
 
 
-# ====================== Explore these outliers ======================
+# ====================== Explore these outliers =====================
 
 spe.subset <- subset(spe, ,sample_id == spe$sample_id[1])
+spe$sum_umi_log2 <- log2(spe$sum_umi)
+
 # Visualize
 p1 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") +
   scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p2 <- make_escheR(spe.subset) |> 
-  add_fill(var = "z.umi") +
+  add_fill(var = "sum_umi_z") +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
 
 p3 <- make_escheR(spe.subset) |> 
   add_fill(var = "sum_umi_log2") |>
-  add_ground(var = "z_umi_outlier", stroke = 1) +
+  add_ground(var = "local_outliers", stroke = 1) +
   scale_color_manual(
     name = "", # turn off legend name for ground_truth
     values = c(
@@ -237,8 +239,8 @@ p3 <- make_escheR(spe.subset) |>
   scale_fill_gradient(low ="white",high =  "darkgreen")
 
 p4 <- make_escheR(spe.subset) |> 
-  add_fill(var = "z.umi") |>
-  add_ground(var = "z_umi_outlier", stroke = 1) +
+  add_fill(var = "sum_umi_z") |>
+  add_ground(var = "local_outliers", stroke = 1) +
   scale_color_manual(
     name = "", # turn off legend name for ground_truth
     values = c(
@@ -247,7 +249,7 @@ p4 <- make_escheR(spe.subset) |>
   ) +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
 
-pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k36.pdf'))
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k36_retest.pdf'))
 (p1+p2)/(p3+p4)
 dev.off()
 
@@ -255,7 +257,7 @@ dev.off()
 
 # ==== Total percentage =====
 # Extract the required columns
-discard_new_col <- spe$z_umi_outlier
+discard_new_col <- as.matrix(spe$local_outliers)
 layer_guess_ordered_col <- spe$layer_guess_reordered
 sample_id_col <- spe$sample_id
 
@@ -290,7 +292,7 @@ p <- ggplot(summary_df, aes(x = layer_guess_ordered, y = percentage_discarded, f
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-pdf(width=8, height=4,here(plot_dir, "Boxplot_percent_discarded_k36.pdf"))
+pdf(width=8, height=4,here(plot_dir, "Boxplot_percent_discarded_k36_retest.pdf"))
 p
 dev.off()
 
