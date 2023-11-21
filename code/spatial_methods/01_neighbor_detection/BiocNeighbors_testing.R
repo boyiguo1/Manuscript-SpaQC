@@ -2,7 +2,7 @@ library(BiocNeighbors)
 library(sp)
 library(spdep)
 library(RANN)
-library(spatialEco)
+#library(spatialEco)
 library(here)
 
 plot_dir = here('plots', 'spatial_methods', '01_neighbor_detection')
@@ -32,8 +32,8 @@ data <- matrix(runif(nobs*ndim), ncol=ndim)
 # [5,] 0.61259099 0.9487847 0.96369114 0.03496125 0.7831489 0.4160534 0.76786320 0.43995124 0.2831979
 # [6,] 0.01407575 0.7379854 0.55780016 0.76624037 0.4417086 0.0140884 0.70392668 0.05055324 0.7651475
 
-fout <- findKNN(coordinates(meuse), k=15)
-fouthead(fout$index)
+fout <- findKNN(coordinates(meuse), k=36)
+head(fout$index)
 # [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10]
 # [1,] 5003 4801 1918 9828 7666 6026 3138 9599 7145  1958
 # [2,] 7074 2970 2760 4899 7113 4927 8443 8199 6960  1033
@@ -64,7 +64,7 @@ head(spatialCoords(spe.subset))
 # AAACAGCTTTCAGAAG-1               2779               7663
 # AAACAGGGTCTATATT-1               3053               8143
 
-dnn <- findKNN(spatialCoords(spe.subset), k=15)$index
+dnn <- findKNN(spatialCoords(spe.subset), k=36)$index
 head(dnn)
 # [,1] [,2] [,3] [,4] [,5] [,6] [,7] [,8] [,9] [,10] [,11] [,12] [,13] [,14] [,15]
 # [1,] 3170 1086 1339 2809 4044 3715 2274 3064 2557  3389    83  2602  2079   248  1275
@@ -108,7 +108,7 @@ unique(spe.subset$nn_standard)
 
 
 # Visualize
-pdf(here(plot_dir, 'SpotPlot_BiocNeighbors_k15.pdf'))
+pdf(here(plot_dir, 'SpotPlot_BiocNeighbors_k36.pdf'))
 vis_clus(
   spe = spe.subset,
   clustervar = "nn_standard",

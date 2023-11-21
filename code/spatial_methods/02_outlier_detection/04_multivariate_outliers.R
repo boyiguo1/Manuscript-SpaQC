@@ -171,6 +171,9 @@ ggplot(as.data.frame(distances), aes(x=md.rob, y=md.cla, color=outliers)) +
   geom_point()
 
 
+# get matrix of z.umi, z.gene.z.mito
+mod_z_matrix <- as.matrix(colData(spe.subset)) %>% 
+  
 
 
 # ========= Local outlier factor using DBCAN ==========
@@ -181,6 +184,11 @@ df <- data.frame(
   umi = spe.subset$z.umi,
   gene = spe.subset$z.gene
 )
+
+df <- as.data.frame(mod_z_matrix) %>% 
+  setNames(features_log2)
+
+
 
 outs <- lof(df, minPts=20)
 outs_scaled <- lof(scale(df), minPts=20)

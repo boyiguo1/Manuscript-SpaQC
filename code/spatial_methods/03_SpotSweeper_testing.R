@@ -210,13 +210,17 @@ dev.off()
 
 # ============ Testing different Ks ==========
 
-spe <- localOutliers(spe, k=36, output_z=TRUE)
+spe <- localOutliers(spe, 
+                     features=c("sum_umi","sum_gene", "expr_chrM_ratio"), 
+                     n_neighbors=36, 
+                     data_output=TRUE,
+                     method="multivariate",
+                     cutoff=3)
 
 
 # ====================== Explore these outliers =====================
 
 spe.subset <- subset(spe, ,sample_id == spe$sample_id[1])
-spe$sum_umi_log2 <- log2(spe$sum_umi)
 
 # Visualize
 p1 <- make_escheR(spe.subset) |> 
@@ -249,7 +253,7 @@ p4 <- make_escheR(spe.subset) |>
   ) +
   scale_fill_gradient2(low ="purple" , mid = "white",high =  "darkgreen")
 
-pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_k36_retest.pdf'))
+pdf(width = 12.5, height = 12.5, here(plot_dir, 'Many_SpotPlots_sumUmi_sumGene_k36_mv.pdf'))
 (p1+p2)/(p3+p4)
 dev.off()
 
@@ -292,7 +296,7 @@ p <- ggplot(summary_df, aes(x = layer_guess_ordered, y = percentage_discarded, f
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-pdf(width=8, height=4,here(plot_dir, "Boxplot_percent_discarded_k36_retest.pdf"))
+pdf(width=8, height=4,here(plot_dir, "Boxplot_percent_discarded_k36_retest_mv.pdf"))
 p
 dev.off()
 
