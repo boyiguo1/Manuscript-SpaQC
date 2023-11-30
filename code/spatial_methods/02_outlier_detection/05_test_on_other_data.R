@@ -272,12 +272,11 @@ colnames(colData(spe.amy))
 # [29] "qc_gene"                "discard_new"            "discard"  
 
 spe.amy <- localOutliers(spe.amy,
-                     feature='sum_umi',
-                     samples='sample_id',
-                     log2=TRUE,
-                     z_threshold=3,
-                     output_z=TRUE
-                     )
+                         features=c("sum_umi","sum_gene", "expr_chrM_ratio"), 
+                         n_neighbors=36, 
+                         data_output=TRUE,
+                         method="multivariate",
+                         cutoff=3)
 
 colnames(colData(spe.amy))
 # [1] "sample_id"              "slide"                  "array"                  "brnum"                 
@@ -291,27 +290,26 @@ colnames(colData(spe.amy))
 # [33] "coords"                 "local_outliers"         "sum_umi_z"    
 
 spe.hyp <- localOutliers(spe.hyp,
-                     feature='sum_umi',
-                     samples='sample_id',
-                     log2=TRUE,
-                     z_threshold=3,
-                     output_z=TRUE
-                     )
+                         features=c("sum_umi","sum_gene", "expr_chrM_ratio"), 
+                         n_neighbors=36, 
+                         data_output=TRUE,
+                         method="multivariate",
+                         cutoff=3)
 
 
 # plot new outliers 
-
+spe.amy$local_outliers <- as.factor(spe.amy$local_outliers)
 vis_grid_clus(
   spe.amy,
   clustervar="local_outliers",
-  pdf_file = here(plot_dir, 'SpotPlots_AMY_local_outliers.pdf'),
+  pdf_file = here(plot_dir, 'SpotPlots_AMY_local_outliers_mv.pdf'),
   height = 24,
   width = 36,
   image_id = "lowres",
   point_size = 2.5,
 )
 
-spe.amy$sum_umi_log2 <- log2(spe.amy$sum_umi)
+#spe.amy$sum_umi_log2 <- log2(spe.amy$sum_umi)
 
 vis_grid_gene(
   spe.amy,
@@ -335,10 +333,12 @@ vis_grid_gene(
   point_size = 2.5,
 )
 
+# ======== Hypothalamus ========
+spe.hyp$local_outliers <- as.factor(spe.hyp$local_outliers)
 vis_grid_clus(
   spe.hyp,
   clustervar="local_outliers",
-  pdf_file = here(plot_dir, 'SpotPlots_HYP_local_outliers.pdf'),
+  pdf_file = here(plot_dir, 'SpotPlots_HYP_local_outliers_mv.pdf'),
   height = 24,
   width = 36,
   image_id = "lowres",

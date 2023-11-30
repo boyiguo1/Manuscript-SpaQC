@@ -9,6 +9,7 @@ library(ggside)
 library(ggpubr)
 library(dplyr)
 library(tidyr)
+library(ggridges)
 
 # Save directories
 plot_dir = here("plots","single_cell_methods")
@@ -17,7 +18,7 @@ processed_dir = here("processed-data","single_cell_methods")
 # ============== Let's plot some metrics using the final published data =========
 
 spe <- fetch_data(type = "spe")
-spe
+spe 
 # class: SpatialExperiment 
 # dim: 33538 47681 
 # metadata(0):
@@ -31,6 +32,7 @@ spe
 # altExpNames(0):
 #   spatialCoords names(2) : pxl_col_in_fullres pxl_row_in_fullres
 # imgData names(4): sample_id image_id data scaleFactor
+
 
 
 colnames(colData(spe))
@@ -56,45 +58,30 @@ colnames(colData(spe))
 
 # =============== Plotting ============
 # let's start by looking at the layer_guess_reordered annotations
+id <- "151507"
 
 p1 <- vis_clus(
   spe = spe,
-  clustervar = "layer_guess_reordered",
-  sampleid = unique(spe$sample_id)[1]
+  clustervar = "spatialLIBD",
+  sampleid = id
 )
 
 p2 <- vis_gene(
   spe = spe,
-  geneid = "expr_chrM",
-  sampleid = unique(spe$sample_id)[1]
+  geneid = "expr_chrM_ratio",
+  sampleid = id
 )
+
 
 p3 <- vis_gene(
   spe = spe,
-  geneid = "expr_chrM_ratio",
-  sampleid =unique(spe$sample_id)[1]
-)
-
-p4 <- vis_gene(
-  spe = spe,
-  geneid = "sum_umi",
-  sampleid =unique(spe$sample_id)[1]
-)
-
-p5 <- vis_gene(
-  spe = spe,
   geneid = "sum_gene",
-  sampleid =unique(spe$sample_id)[1]
+  sampleid = id
 )
 
-p6 <- vis_gene(
-  spe = spe,
-  geneid = "cell_count",
-  sampleid =unique(spe$sample_id)[1]
-)
 
 pdf(height = 10, width=20, here(plot_dir, 'SpotPlots_dlPFC_typical_QC_metrics.pdf'))
-(p1+p2+p3)/(p4+p5+p6)
+(p1+p2+p3)
 dev.off()
 
 # =========== plotting average single cell QC metrics per layer ===========
@@ -105,6 +92,7 @@ expr_ratio <- colData(spe)$expr_chrM_ratio
 layer_data <- colData(spe)$layer_guess_reordered
 cell_count <- colData(spe)$cell_count
 sum_umi <- colData(spe)$sum_umi
+sum_gene <- colData(spe)$sum_gene
 
 # Check that the lengths of the extracted data are the same
 if(length(expr_data) != length(layer_data)) {
@@ -117,113 +105,55 @@ combined_data <- data.frame(
   expr_ratio = expr_ratio,
   layer = layer_data,
   sum_umi = sum_umi,
-  cell_count = cell_count
+  cell_count = cell_count,
+  sum_gene = sum_gene
 )
 
-# Create the boxplot
-p1 <- ggplot(combined_data, aes(x = layer, y = expr_chrM, fill = layer)) +
-  geom_boxplot(alpha = 0.8, width = 0.7, outlier.shape = NA) + # Boxplot without outliers
-  theme(legend.position = "none") + # Remove legend
-  labs(title = "Expression of expr_chrM per layer",
-       x = "Layer",
-       y = "Expression level")
+# drop "NA" layer
+combined_data <- combined_data[!is.na(combined_data$layer),]
 
-# Create the boxplot
-p2 <- ggplot(combined_data, aes(x = layer, y = sum_umi, fill = layer)) +
-  geom_boxplot(alpha = 0.8, width = 0.7, outlier.shape = NA) + # Boxplot without outliers
-  theme(legend.position = "none") + # Remove legend
-  labs(title = "Library size",
-       x = "Layer",
-       y = "Sum UMI")
+# reverse the y order so that layer 1 is at the top
+combined_data$layer <- factor(combined_data$layer, levels = rev(levels(combined_data$layer)))
 
-# Create the boxplot
-p3 <- ggplot(combined_data, aes(x = layer, y = cell_count, fill = layer)) +
-  geom_boxplot(alpha = 0.8, width = 0.7, outlier.shape = NA) + # Boxplot without outliers
-  theme(legend.position = "none") + # Remove legend
-  labs(title = "Cell counts",
-       x = "Layer",
-       y = "Cells")
 
-# Create the boxplot
-p4 <- ggplot(combined_data, aes(x = layer, y = expr_ratio, fill = layer)) +
-  geom_boxplot(alpha = 0.8, width = 0.7, outlier.shape = NA) + # Boxplot without outliers
-  theme(legend.position = "none") + # Remove legend
-  labs(title = "Percent Mito",
-       x = "Layer",
-       y = "Percent mito (%)")
+# ridge plot of sum_umi with a threshold of 500
 
-pdf(height = 15, width=7.5, here(plot_dir, 'Boxplots_dlPFC_typical_QC_metrics.pdf'))
-p1/p2/p3/p4
+pdf(here(plot_dir, 'Ridges_sum_umi.pdf'), height = 7, width=7)
+ggplot(combined_data, aes(x = sum_umi, y = layer, fill = layer)) +
+  geom_density_ridges(alpha = 0.8, scale = 1.5) +
+  geom_vline(xintercept = 500, linetype = "dashed", color = "red", size=1) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = libd_layer_colors) +
+  labs(title = "Library size per layer",
+       x = "Library Size",
+       y = "Spatial Domain")
+dev.off()
+
+# ridge plot of expr_ratio with a threshold of 0.3
+pdf(here(plot_dir, 'Ridges_expr_ratio.pdf'), height = 7, width=7)
+ggplot(combined_data, aes(x = expr_ratio, y = layer, fill = layer)) +
+  geom_density_ridges(alpha = 0.8, scale = 1.5) +
+  geom_vline(xintercept = 0.3, linetype = "dashed", color = "red", size=1) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = libd_layer_colors) +
+  labs(title = "Mitochondrial percent per layer",
+       x = "Mito %",
+       y = "Spatial Domain")
+dev.off()
+
+# ridge plot of sum_gene with a threshold of 500
+pdf(here(plot_dir, 'Ridges_sum_gene.pdf'), height = 7, width=7)
+ggplot(combined_data, aes(x = sum_gene, y = layer, fill = layer)) +
+  geom_density_ridges(alpha = 0.8, scale = 1.5) +
+  geom_vline(xintercept = 500, linetype = "dashed", color = "red", size=1) +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = libd_layer_colors) +
+  labs(title = "Number of genes per layer",
+       x = "Number of genes",
+       y = "Spatial Domain")
 dev.off()
 
 
-# ============= Let's quantify some more typical QC metircs ===========
-
-# histogram of library sizes
-pdf(here(plot_dir, "Histogram_dlPFC_LibrarySize_.pdf"))
-hist(colData(spe)$sum_umi, breaks = 80, xlim=c(0,15000))
-dev.off()
-
-# histogram of mito %
-pdf(here(plot_dir, "Histogram_dlPFC_MitoPercent_.pdf"))
-hist(colData(spe)$expr_chrM_ratio, breaks = 20)
-dev.off()
-
-#### Both library size and mito percent are relatively uniform with very few spots >30% mito. But is this equal for all layers?
-
-
-p1 <- ggplot(combined_data, aes(x=expr_ratio, fill=layer)) +
-  geom_histogram(alpha=0.5, position="identity", bins=30) +
-  theme_minimal() +
-  labs(title="Histogram of mito percent by Layer", x="Mito Percent", y="Count", fill="Layer")
-
-p2 <- ggplot(combined_data, aes(x=expr_ratio, fill=layer)) +
-  geom_density(alpha=0.5, adjust=1) +
-  theme_minimal() +
-  labs(title="Density of mito percent by Layer", x="Mito Percent", y="Density", fill="Layer")
-
-pdf(height = 5, width=10, here(plot_dir, 'Histogram_dlPFC_mito_by_layer.pdf'))
-(p1+p2)
-dev.off()
-
-
-p1 <- ggplot(combined_data, aes(x=sum_umi, fill=layer)) +
-  geom_histogram(alpha=0.5, position="identity", bins=30) +
-  theme_minimal() +
-  labs(title="Histogram of mito percent by Layer", x="Sum UMI", y="Count", fill="Layer")
-
-p2 <- ggplot(combined_data, aes(x=sum_umi, fill=layer)) +
-  geom_density(alpha=0.5, adjust=1) +
-  theme_minimal() +
-  labs(title="Density of library size by Layer", x="Sum UMI", y="Density", fill="Layer")
-
-pdf(height = 5, width=10, here(plot_dir, 'Histogram_dlPFC_sum_by_layer.pdf'))
-(p1+p2)
-dev.off()
-
-
-
-# ================= Let's now look at how discarding spots based on standard single cell QC metrics effects layers =============
-
-
-
-threshold_x = 500
-threshold_y = 0.3
-p <- ggplot(combined_data, aes(x = sum_umi, y = expr_ratio, color=layer)) + 
-  geom_point(size = 0.5, alpha=0.2) + 
-  ggtitle("QC metrics") + 
-  theme_bw() + 
-  scale_color_manual(name = "", values = spatialLIBD::libd_layer_colors) +
-  geom_vline(xintercept = threshold_x, color = "black", linetype="dashed") +
-  geom_hline(yintercept = threshold_y, color = "black", linetype="dashed") +
-  geom_xsidedensity() + 
-  geom_ysidedensity() +
-  stat_ellipse()
-
-
-pdf(here(plot_dir, "QCscatter_MitoPercent_vs_SumUmi_elipse.pdf"))
-p
-dev.off()
 
 # ======== Let's discard based on these conservative threshold and see how it looks =======
 
@@ -237,12 +167,31 @@ table(qc_umi)
 # FALSE  TRUE 
 # 47372   309 
 
+qc_gene <- colData(spe)$sum_gene < 500 # this is arbitrary
+table(qc_gene)
+
 colData(spe)$qc_mito <- qc_mito
 colData(spe)$qc_umi <- qc_umi
+colData(spe)$qc_gene <- qc_gene
 
-discard_new <- qc_umi | qc_mito
-spe$discard_new <- discard_new
+sc_outliers <- qc_umi | qc_mito | qc_gene
+spe$discard_new <- sc_outliers
 
+# get subset of first sample
+spe.subset <- spe[,spe$sample_id == unique(spe$sample_id)[1]]
+
+# plot using escheR
+p1 <- make_escheR(spe.subset) |> 
+  add_fill(var = "layer_guess_reordered") +
+  scale_fill_manual(values = libd_layer_colors)
+
+p2 <- make_escheR(spe.subset) |> 
+  add_fill(var = "discard_new") +
+  scale_fill_manual(name = "",values = c("TRUE" = "red", "FALSE" = "grey")) 
+
+pdf(here(plot_dir, 'Layers_vs_discarded.pdf'), height = 7, width=14)
+p1+p2
+dev.off()
 
 p1 <- vis_clus(
   spe = spe,
@@ -253,13 +202,13 @@ p1 <- vis_clus(
 p2 <- vis_clus(
   spe = spe,
   clustervar = "layer_guess_reordered",
-  sampleid = unique(spe$sample_id)[2]
+  sampleid = unique(spe$sample_id)[4]
 )
 
 p3 <- vis_clus(
   spe = spe,
   clustervar = "layer_guess_reordered",
-  sampleid = unique(spe$sample_id)[3]
+  sampleid = unique(spe$sample_id)[7]
 )
 
 p4 <- vis_clus(
@@ -271,13 +220,13 @@ p4 <- vis_clus(
 p5 <- vis_clus(
   spe = spe,
   clustervar = "discard_new",
-  sampleid = unique(spe$sample_id)[2]
+  sampleid = unique(spe$sample_id)[4]
 )
 
 p6 <- vis_clus(
   spe = spe,
   clustervar = "discard_new",
-  sampleid = unique(spe$sample_id)[3]
+  sampleid = unique(spe$sample_id)[7]
 )
 
 
@@ -286,58 +235,31 @@ pdf(width=20, height=10,here(plot_dir, "SpotPlot_discard_new.pdf"))
 dev.off()
 
 
-# =========== Now let's quantify the discarded spots based on layer ID =========
 
-# ==== Total percentage =====
-# Extract the required columns from the spe object
-discard_new_col <- spe$discard_new
-layer_guess_ordered_col <- spe$layer_guess_reordered
-
-# Filter out the discarded spots
-discarded_indices <- which(discard_new_col == TRUE)
-discarded_domains <- layer_guess_ordered_col[discarded_indices]
-
-
-# Count the occurrences of each spatial domain for the discarded spots
-domain_discarded_counts <- table(discarded_domains)
-domain_total_counts <- table(layer_guess_ordered_col)
-discarded_percentages <- (domain_discarded_counts/domain_total_counts)*100
-
-# Convert the domain counts to a data frame
-df <- as.data.frame(discarded_percentages)
-colnames(df) <- c("SpatialDomain", "Percentage")
-
-# Plot using ggplot2
-p <- ggplot(df, aes(x = SpatialDomain, y = Percentage, fill = SpatialDomain)) +
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = spatialLIBD::libd_layer_colors) +
-  labs(title = "Average Percentage of Discarded Spots for each Spatial Domain",
-       x = "Spatial Domain",
-       y = "Percentage") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-pdf(width=6, height=3,here(plot_dir, "Barplot_discarded_by_layer.pdf"))
-p
-dev.off()
-
-
-# ===== Average percentage across samples =====
+# ===== Average percentage discarded across samples =====
 # Extract the required columns
 discard_new_col <- spe$discard_new
 layer_guess_ordered_col <- spe$layer_guess_reordered
 sample_id_col <- spe$sample_id
+subject_col <- spe$subject
+position_col <- spe$subject_position
+
+# rewrite position_col such that if CONTAINS "pos0", make it "0um", if else "300um"
+new_position_col <- ifelse(grepl("pos0", position_col), "0um", "300um")
+unique(position_col)
 
 # Create a data frame
 df <- data.frame(discard_new = discard_new_col,
                  layer_guess_ordered = layer_guess_ordered_col,
-                 sample_id = sample_id_col)
+                 sample_id = sample_id_col,
+                 subject = subject_col,
+                 position = new_position_col)
 
 df <- df[!is.na(df$layer_guess_ordered), ]
 
 
 summary_df <- df %>%
-  group_by(sample_id, layer_guess_ordered) %>%
+  group_by(sample_id, layer_guess_ordered, subject, position) %>%
   summarise(
     total_spots = n(),  # Total number of spots in each domain for each sample
     discarded_spots = sum(discard_new, na.rm = TRUE),  # Counting TRUE as 1 and FALSE as 0
@@ -346,7 +268,17 @@ summary_df <- df %>%
   mutate(
     percentage_discarded = (discarded_spots / total_spots) * 100  # Calculating the percentage
   ) 
-
+head(summary_df)
+# # A tibble: 6 × 7
+# # Groups:   sample_id, layer_guess_ordered, subject, position [6]
+#   sample_id layer_guess_ordered subject position total_spots discarded_spots
+# <chr>     <fct>               <chr>   <chr>          <int>           <int>
+# 1 151507    Layer1              Br5292  0um              817              29
+# 2 151507    Layer2              Br5292  0um              305               0
+# 3 151507    Layer3              Br5292  0um             1215              13
+# 4 151507    Layer4              Br5292  0um              369              10
+# 5 151507    Layer5              Br5292  0um              675               5
+# 6 151507    Layer6              Br5292  0um              486               1
 
 
 # Plot using ggplot2
@@ -367,3 +299,18 @@ dev.off()
 
 
 
+# stacked bar plot of discarded spot per sample by layer
+pdf(width=8, height=4,here(plot_dir, "Barplot_discarded_by_layer.pdf"))
+ggplot(summary_df, aes(x = sample_id, y = discarded_spots, fill = layer_guess_ordered)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = spatialLIBD::libd_layer_colors) +
+  labs(title = "Total Number of Discarded Spots per Sample",
+       x = "Sample ID",
+       y = "Number of Spots") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~subject, 
+             scales = "free_x",
+             switch = "x",
+             nrow=1)
+dev.off()
